@@ -7,6 +7,8 @@ import com.btc.moviechart.dto.MovieUpdateDtoRequest;
 import com.btc.moviechart.model.Movie;
 import com.btc.moviechart.repository.MovieRepository;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -17,6 +19,7 @@ import java.util.stream.Collectors;
 
 @Service
 public class MovieService {
+    private final Logger logger = LoggerFactory.getLogger(MovieService.class);
     private final MovieRepository movieRepository;
     private final RankingService rankingService;
 
@@ -27,6 +30,7 @@ public class MovieService {
 
     public MovieDtoResponse save(MovieDtoRequest movieDtoRequest) {
         Movie movie = this.movieRepository.save(buildMovie(movieDtoRequest));
+        logger.info("Add movie to DB:{}", movie);
         FavoriteDtoResponse favoriteDtoResponse = this.rankingService.save(movie.getId(), movieDtoRequest.getRating());
         return buildMovieDtoResponse(movie, favoriteDtoResponse.getRankOfMovie());
     }
@@ -34,12 +38,14 @@ public class MovieService {
     public MovieDtoResponse findByTitle(String title) {
         Movie movie = this.movieRepository.findByTitle(title)
                                           .orElseThrow(() -> new RuntimeException("Not found movie by title:" + title));
+        logger.info("Find movie by title:{}, {}", title, movie);
         FavoriteDtoResponse favoriteDtoResponse = this.rankingService.findById(movie.getId());
         return buildMovieDtoResponse(movie, favoriteDtoResponse.getRankOfMovie());
     }
 
     public List<MovieDtoResponse> getAll() {
         List<Movie> movies = this.movieRepository.findAll();
+        logger.info("List movies:{}", movies);
         Map<Integer, Integer> collectByMovieId = movies.stream()
                                                        .map(movie -> this.rankingService.findById(movie.getId()))
                                                        .collect(Collectors.toMap(
@@ -53,14 +59,24 @@ public class MovieService {
                      })
                      .toList();
     }
+
     @Transactional
     public void deleteByTitle(String title) {
         Optional<Movie> movie = this.movieRepository.findByTitle(title);
         this.rankingService.deleteById(movie.orElseThrow(() -> new RuntimeException("Not found movie by title:" + title))
                                             .getId());
         this.movieRepository.deleteByTitle(title);
+        logger.info("Delete movie:{}", movie.get());
     }
 
+    public MovieDtoResponse update(MovieUpdateDtoRequest movieUpdateDtoRequest) {
+        Movie movie = this.movieRepository.findById(movieUpdateDtoRequest.getId())
+                                          .orElseThrow(() -> new RuntimeException("Not found movie by id:" + movieUpdateDtoRequest.getId()));
+        logger.info("Find movie by title:{}", movie);
+        FavoriteDtoResponse favoriteDtoResponse = this.rankingService.save(movie.getId(),
+                movieUpdateDtoRequest.getRating());
+        return buildMovieDtoResponse(movie, favoriteDtoResponse.getRankOfMovie());
+    }
 
     private Movie buildMovie(MovieDtoRequest movieDtoRequest) {
         return new Movie(movieDtoRequest.getTitle(), movieDtoRequest.getYear());
@@ -72,12 +88,5 @@ public class MovieService {
                 rankOfMovie,
                 movie.getTitle(),
                 movie.getYear());
-    }
-
-    public MovieDtoResponse update(MovieUpdateDtoRequest movieUpdateDtoRequest) {
-        Movie movie = this.movieRepository.findById(movieUpdateDtoRequest.getId())
-                                          .orElseThrow(() -> new RuntimeException("Not found movie by id:" + movieUpdateDtoRequest.getId()));
-        FavoriteDtoResponse favoriteDtoResponse = this.rankingService.save(movie.getId(), movieUpdateDtoRequest.getRating());
-        return buildMovieDtoResponse(movie, favoriteDtoResponse.getRankOfMovie());
     }
 }
