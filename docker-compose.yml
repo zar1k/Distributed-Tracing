@@ -1,0 +1,31 @@
+version: '3.8'
+
+services:
+
+  postgresql:
+    image: postgres:alpine
+    restart: always
+    ports:
+      - '5432:5432'
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: pwd
+    volumes:
+      - ./create_db.sql:/docker-entrypoint-initdb.d/create_db.sql
+
+  redis:
+    image: redis
+    restart: always
+    ports:
+      - '6379:6379'
+
+  collector:
+    image: otel/opentelemetry-collector:latest
+    container_name: collector
+    hostname: collector
+    command: [ "--config=/etc/collector-config.yaml" ]
+    volumes:
+      - ./opentelemetry-collector-exporter-elastic.yaml:/etc/collector-config.yaml
+    ports:
+      - '5555:5555'
+      - '6666:6666'
